@@ -1,0 +1,42 @@
+TODO:
+
+I ??? sono secondari
+
+- Verificare perchè non la risposta 2 (che dovrebbe essere piatta) ha sempre quell'andamento a cazzo, dipende dal tipo di algo usato...
+
+
+- Introdurre spettrogramma della misura e del waterfall con un combobox (nothing, spectrogram, waterfall (tutti fft lineare) nel panel delle misure
+
+
+
+ 
+
+% --- Executes on button press in pushbuttonFFTParams.
+function pushbuttonFFTParams_Callback(hObject, eventdata, handles)
+% hObject    handle to pushbuttonFFTParams (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+algo=handles.generalParams.algorithm;
+if (strcmp(algo,'linear'))
+    oldParams=handles.generalParams.linear;
+    [h newParams]=GUI_linearFFTOption(oldParams);
+    if ~isempty(h) && ishandle(h)
+        close(h);
+        handles.generalParams.linear=newParams;
+        handles.response=calcFFT(handles);
+        if ishandle (handles.fftFigure)
+            plotFFT(hObject, eventdata, handles);
+        end
+
+    end
+  %Memorizza vecchia struttura dati linear
+  %chiama GUI con vecchia struttura dati,
+  %se differenze tra nuova e vecchia chiama...
+elseif (strcmp(algo,'constq'))
+    
+elseif (strcmp(algo,'brownconstq'))
+    
+else
+    warning('pushbuttonFFTParams_Callback: non dovrei mai essere qui!!')
+end
+guidata(hObject, handles);

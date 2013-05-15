@@ -1,0 +1,16 @@
+function SND_test()
+
+
+SCRIPT_setEnviromet()
+fs=44100;
+audioDevs = SND_findDevices();
+measure=UTIL_defaultMeasParams();%TODO, cambiare nome... boh...
+audioDev=measure.audioDevice;
+[h status audioDev fs]=GUI_selectAudioInterface(fs,audioDevs,audioDev);
+close(h)
+SND_openDevice(audioDev.playDevice, audioDev.recDevice, fs);
+while(1)
+    
+    [sOut(:,:) generatorData]=DUALCHANNELFFT_generator(generalParams, generatorParams, generatorData, fs, lowSample ,upSample, audioDev.playDevice.channels);
+    
+end

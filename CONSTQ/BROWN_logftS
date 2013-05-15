@@ -1,0 +1,114 @@
+% logftS.m  7/01  file to run logft calculation
+%	 EX with defaults: 
+%			[cqtrans, tt, freqs, kerncos, kernsin] = logftS(vsc11);
+%
+%   EX inputting all values (same as defaults here)
+%			[cqtrans, tt, freqs, kerncos, kernsin] =  ...
+%           logftS(vsc11, 'SR', 11025, 'minfreq', 174.6141,'freqrat', 1.0293, 'maxfreq', 5512, ...
+%		     'windsizmax', 1102, 'hopsiz', 150, 'graphit', 0 , 'wintype', 'kaiser8', 'complex', 0, 'constwind', 0 , 'Phase0', 0);
+%
+%   EX if kernels previously calculated; will speed up calc
+%			[cqtrans, tt, freqs, kerncos, kernsin] =  ...
+%           logftS(vsc11, 'SR', 11025, 'minfreq', 174.6141,'freqrat', 1.0293, 'maxfreq', 5512, ...
+%		     'windsizmax', 1102, 'hopsiz', 150, 'graphit', 0, 'complex', 0, 'kerncos', kerncos, 'kernsin', kernsin, 'constwind', constwind);
+
+function  [cqtrans, tt, freqs, kerncos, kernsin] = logftS(infile, varargin);
+
+% change so  windsizmax and hopsiz in ms
+
+% DEFAULTS
+ SR  = 11025;					 % sample rate
+ minfreq = 174.6141;         % G3 = freq of G below middle C in Hz
+ freqrat  = 2^(1/24);        % quarter tone spacing = 1.0293022366;  
+ gflag = 0; 						% 'graphit', 1   will draw a waterfall plot of the transform
+ Winnam = 'hamming';
+ ccx = 0;
+ constwind = 0;
+ phase0 = 0;
+%  constwind = 0;
+% OPTIONAL INPUTS with examples
+% maxfreq  = SR/2 ;					 % maximum frequency
+% windsizmax = 1102;          % maximum window size in samples = 100 ms at SR 11025
+% hopsiz = 150;					 % samples between frames = 15 ms at SR 11025
+
+	for jj = 1: length(varargin)
+		if(strcmp(varargin{jj}, 'SR') == 1)
+		   SR = varargin{jj + 1};
+			jj = jj + 1;
+	   elseif(strcmp('minfreq', varargin{jj}))
+			minfreq = varargin{jj+1};
+		   jj = jj + 1;
+	   elseif(strcmp('freqrat', varargin{jj}))
+			freqrat = varargin{jj+1};
+			jj = jj + 1;
+	   elseif(strcmp('maxfreq', varargin{jj}))
+			maxfreq = varargin{jj+1};
+			jj = jj + 1;
+	   elseif(strcmp('windsizmax', varargin{jj}))
+			windsizmax = varargin{jj+1};
+			jj = jj + 1;
+	   elseif(strcmp('hopsiz', varargin{jj}))
+			hopsiz = varargin{jj+1} ;
+			jj = jj + 1;
+	   elseif(strcmp('graphit', varargin{jj}))
+			gflag = varargin{jj+1} ;
+			jj = jj + 1;
+	   elseif(strcmp('kerncos', varargin{jj}))
+			kerncos = varargin{jj+1} ;
+			jj = jj + 1;
+	   elseif(strcmp('kernsin', varargin{jj}))
+			kernsin = varargin{jj+1} ;
+			jj = jj + 1;
+        elseif(strcmp('wintype', varargin{jj}))
+			Winnam = varargin{jj+1} ;
+			jj = jj + 1;
+        elseif(strcmp('complex', varargin{jj}))
+			ccx = varargin{jj+1} ;
+			jj = jj + 1;        
+        elseif(strcmp('constwind', varargin{jj}))
+			constwind = varargin{jj+1} ;
+			jj = jj + 1;
+        elseif(strcmp('Phase0', varargin{jj}))
+			phase0 = varargin{jj+1} ;
+			jj = jj + 1;
+		end
+	end
+		
+if ~exist('windsizmax') 
+   windsizmax = floor( .1 * SR);
+	fprintf('logftS: No input maximum window size. Taking $.1f ms max = %.0f samples.\n',1000* SR/windsizmax, windsizmax);
+end 
+
+if ~exist('maxfreq'), 	maxfreq = fix(SR/2); end % Calc to Nyq if not input
+if maxfreq > SR/2 
+	maxfreq = fix(SR/2);
+	fprintf('logftS: WARNING! Input maxfreq is over Nyquist; taking Nyquist = %.0f instead', maxfreq); 
+end
+if exist('constwind') & constwind ~= 0, fprintf('logftS: calculation with constant window size %.0f \n', constwind); end
+	% Get number of bins for these min and max freqs
+nfreqs = 1 + fix( log(maxfreq/minfreq)/log(freqrat) ); 
+fprintf('logftS: Calculating %.0f freq bins from %.0f to %.0f .\n', nfreqs, minfreq, maxfreq);
+
+if ~exist('hopsiz'), hopsiz = floor(.015*SR);  end     % 15 ms
+
+freqs = minfreq * (freqrat .^ [(0:1:nfreqs-1)]);
+
+		% Generate kernels for BASIS FNS if not previously calculated
+if ~exist('kerncos') | ~exist('kernsin')
+	fprintf('Calculating kernels'); 
+    if phase0 == 0, fprintf(' with center of window symmetric. \n\n');
+    else, fprintf(' with phase 0 wrt beginning of window. \n\n'); end
+   [kerncos, kernsin, freqs] = genlgftkern(minfreq, freqrat, SR, nfreqs, windsizmax, Winnam, constwind,  phase0);           % GENLGFTKERN
+else fprintf('Kernels previously calculated; hope they re appropriate for this infile..\n')
+end
+[rrr ccc] = size(kerncos);
+if (ccc > length(infile)), error('Length of infile < max window size\n'); end
+		%	Calculate cq transform
+[cqtrans, tt]  = logft(infile, hopsiz, kerncos, kernsin,  windsizmax, nfreqs, SR, ccx);                                         %LOGFT
+
+if gflag == 1
+    figure
+	waterfall(freqs, tt, abs(cqtrans)); view(0, 70)
+	set( gca, 'XScale', 'log'); axis tight; grid off
+	%set(gca,'XTick', [100 300 1000 3000 ])
+end
